@@ -41,7 +41,7 @@ class ApplicationControllerSpec extends UnitSpec with GuiceOneAppPerTest with Mo
     100
   )
 
-  "ApplicationController .index" when {
+  "ApplicationController .index" should {
 
     "return OK" in {
 
@@ -52,9 +52,14 @@ class ApplicationControllerSpec extends UnitSpec with GuiceOneAppPerTest with Mo
 
       status(result) shouldBe Status.OK
     }
+
+//    "checking the json body" in {
+//      val result = TestApplicationController.index()(FakeRequest())
+//      await(jsonBodyOf(result))
+//    }
   }
 
-  "ApplicationController .create" when {
+  "ApplicationController .create" should {
 
     "the json body is valid" should {
 
@@ -93,11 +98,41 @@ class ApplicationControllerSpec extends UnitSpec with GuiceOneAppPerTest with Mo
 
     }
 
+    "the mongo data creation failed" should {
+
+      val jsonBody: JsObject = Json.obj(
+        "_id" -> "abcd",
+        "name" -> "test name",
+        "description" -> "test description",
+        "numSales" -> 100
+      )
+
+      "return an error" in {
+
+        when(mockDataRepository.create(any()))
+          .thenReturn(Future.failed(GenericDriverException("Error")))
+
+        val result = TestApplicationController.create()(FakeRequest().withBody(jsonBody))
+
+        status(result) shouldBe Status.INTERNAL_SERVER_ERROR
+        await(bodyOf(result)) shouldBe Json.obj("message" -> "Error adding item to Mongo").toString()
+      }
+    }
+
   }
 
 
   "ApplicationController .read()" should {
 
+    "return OK" in {
+
+      when(mockDataRepository.read(any()))
+        .thenReturn(Future(dataModel))
+
+      val result = TestApplicationController.read("_id": String)(FakeRequest())
+
+      status(result) shouldBe Status.OK
+    }
   }
 
   "ApplicationController.update()" when {
@@ -137,12 +172,21 @@ class ApplicationControllerSpec extends UnitSpec with GuiceOneAppPerTest with Mo
 
         status(result) shouldBe Status.BAD_REQUEST
       }
+
     }
   }
 
 
   "ApplicationController .delete()" should {
+    "return Accepted" in{
+      val writeResult: WriteResult = LastError(ok = true, None, None, None, 0, None, updatedExisting = false, None, None, wtimeout = false, None, None)
 
+      when(mockDataRepository.delete("_id":String))
+        .thenReturn(Future(writeResult))
+
+      val result = TestApplicationController.delete("_id":String)(FakeRequest())
+      status(result) shouldBe Status.ACCEPTED
+    }
   }
 
 }
